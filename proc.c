@@ -532,3 +532,31 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+int
+clone(void *stack, int size)
+{
+  cprintf("clone process");
+  int i, pid;
+  struct proc *np, *pp;
+  uint stacksize;
+
+  if((np = allocproc()) == 0) {
+    cprintf("allocproc error \n");
+    return -1;
+  }
+  if(((uint)stack % PGSIZE) != 0 || stack == 0) {
+    cprintf("stack fail\n");
+    return -1;
+  }
+
+
+// TODO: return the PID of the child to the parent, and 0 to the newly-created child thread
+  return 0;
+}
+
+int thread_create(void(*start_routine)(void *), void *arg) {
+  int pid;
+
+  return pid;
+}
