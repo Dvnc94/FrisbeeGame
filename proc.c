@@ -86,6 +86,7 @@ allocproc(void)
   return 0;
 
 found:
+  p->is_thread = 0;
   p->state = EMBRYO;
   p->pid = nextpid++;
 
@@ -174,6 +175,43 @@ growproc(int n)
   return 0;
 }
 
+int
+clone(void *stack, int size)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *cproc = myproc();
+
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  np->pgdir = cproc->pgdir;
+  np->sz = cproc->sz;
+  np->parent = cproc;
+  *np->tf = *cproc->tf;
+  np->is_thread = 1;
+  np->tf->eax = 0;
+  uint stack_size = 0;
+  stack_size = cproc->tf->ebp - cproc->tf->esp;
+  stack_size += 16;
+  np->tf->ebp = (int)stack + size - 16;
+  np->tf->esp = np->tf->ebp - stack_size + 16;
+  memmove((void *)np->tf->esp, (void*)cproc->tf->esp, stack_size);
+
+  for(i = 0; i < NOFILE; i++)
+    if(cproc->ofile[i])
+      np->ofile[i] = cproc->ofile[i];
+
+  np->cwd = cproc->cwd;
+  safestrcpy(np->name, cproc->name, sizeof(cproc->name));
+  pid = np->pid;
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+  return pid;
+}
+
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -234,12 +272,16 @@ exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
-  // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
-    }
+  if(curproc->is_thread == 0)
+  {
+	  for(fd = 0; fd < NOFILE; fd++)
+    {
+	    if(curproc->ofile[fd])
+      {
+	      fileclose(curproc->ofile[fd]);
+	      curproc->ofile[fd] = 0;
+	    }
+	  }
   }
 
   begin_op();
@@ -531,32 +573,4 @@ procdump(void)
     }
     cprintf("\n");
   }
-}
-
-int
-clone(void *stack, int size)
-{
-  cprintf("clone process");
-  int i, pid;
-  struct proc *np, *pp;
-  uint stacksize;
-
-  if((np = allocproc()) == 0) {
-    cprintf("allocproc error \n");
-    return -1;
-  }
-  if(((uint)stack % PGSIZE) != 0 || stack == 0) {
-    cprintf("stack fail\n");
-    return -1;
-  }
-
-
-// TODO: return the PID of the child to the parent, and 0 to the newly-created child thread
-  return 0;
-}
-
-int thread_create(void(*start_routine)(void *), void *arg) {
-  int pid;
-
-  return pid;
 }
